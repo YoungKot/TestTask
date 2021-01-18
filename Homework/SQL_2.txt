@@ -1,0 +1,59 @@
+# Selects all the attributes
+SELECT *
+
+FROM (
+SELECT
+# Selects id and changes the name to receivable_id
+ R.id AS receivable_id
+# Selects contract_id
+, R.contract_id
+# Selects balance and changes the name to receivable_balance
+, R.balance AS receivable_balance
+# Selects amount and changes the name to receivable_amt
+, R.amount AS receivable_amt
+# Sums all the amounts from receivable_items table
+, SUM(RI.amount) AS ri_amount
+# Sums all the balances from receivable_items table
+, SUM(RI.balance) AS ri_balance
+# Sums all the balances from receivable_item_changes table query
+, SUM(RIC.ric_amount) AS ric_amount
+
+# From table receivables, changes the name to R
+FROM receivables AS R
+
+# joins tables based on the left table which is receivables
+LEFT JOIN receivable_items AS RI
+# Joins on id
+	ON RI.receivable_id = R.id
+
+# joins tables based on the left table
+LEFT JOIN (
+# Selects amount and changes the name to receivable_item_id and negative sum of amounts
+SELECT
+ receivable_item_id
+, -SUM(amount) AS ric_amount
+
+# From table receivable_item_changes
+FROM receivable_item_changes
+
+# Groups by first column
+GROUP BY 1
+) AS RIC
+# Joins on id
+	ON RIC.receivable_item_id = RI.id
+
+# cotract iid from table receivables must be 1469
+--WHERE R.contract_id = 1469
+
+
+# Groups by first 4 columns
+GROUP BY 1,2,3,4
+) AS A
+
+# receivable amounts which are null are replaced by 0 and can not be equal to ri_amout where nulls are replaced by 0
+WHERE COALESCE(receivable_amt,0) <> COALESCE(ri_amount,0)
+# or receivable amounts which are null are replaced by 0 and can not be equal to sum of ric_amout and receivable_balance where nulls are replaced by 0
+	OR COALESCE(receivable_amt,0) <> COALESCE(ric_amount,0) + COALESCE(receivable_balance,0)
+# or receivable amounts which are null are replaced by 0 and can not be equal to sum of ric_amout and ri_balance where nulls are replaced by 0
+	OR COALESCE(ri_amount,0) <> COALESCE(ric_amount,0) + COALESCE(ri_balance,0)
+# or means that at least one condition must be satisfied
